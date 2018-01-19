@@ -1,0 +1,80 @@
+Set<Id> oppIds = sourceOppList & targetOpp Ids
+List<PO> poList = [select id from PO where CHL_Opportunity__c = oppIds];
+for(PO obj :POList) {
+	if(obj.CHL_Opportunity__c == targetOpp.id) {
+		targetPOList.add(obj);
+	} else {
+		sourcePOList.add(obj);
+	}
+}
+
+----------Form PO to PRR Map-----------------------
+Map<Id, PO> targetPOMap = targetPOList;
+Map<Id, PO> sourcePOMap = sourcePOList;
+Set<Id> poIdSet.add(targetPOMap.key());
+poIdSet.add(sourcePOMap.key());
+List<PRR> prrList = [select id from PRR where CHL_Partner_Opportunity__c IN : poIdSet];
+for(prr prr :prrList) {
+	if(targetPOMap.contains(prr.CHL_Partner_Opportunity__c)) {
+		Map<Id, List<PRR>) targetPO2PRRMap.put(prr.CHL_Partner_Opportunity__c, add list prr);
+	} else if (sourcePOMap.contaiins(prr.CHL_Partner_Opportunity__c)) {
+		Map<Id, List<PRR>) sourcePO2PRRMap.put(prr.CHL_Partner_Opportunity__c, add list prr);
+	}
+}
+targetPO2PRRMap --Map
+sourcePO2PRRMap --Map
+------------Find which can be reparented and which needs to be new one----------------
+for(PO spo : sourcePOList) {
+	for(PO tpo : targetPOList) {
+		if(spo.PA1 == tpo.PA1 && spo.PA2 == tpo.PA2) { // What in case of no Partner Account is populated on any of the PO..
+			Map<Id, Id> target2SourcePOMap.put(tpo.id,spo.id);
+			List<PO> useExistingPO.add(tpo);
+		} else {
+			List<PO> createNewPO.add(spo);
+		}
+	}
+}
+
+------------------Create New POs--------------------------------------------------
+if(createNewPO != null) {
+	create new PO using mapping;
+	newPOsList is formed;
+}
+Insert newPOsList;
+
+------------------Re-Parent PRR---------------------------------------------------
+List<PRR> finalPRRList;
+if(useExistingPO != null) {
+	for(PO existingPO : useExistingPO) {
+		if(target2SourcePOMap	.contains(existingPO.Id)) {
+			Id sourcePOId = target2SourcePOMap.get(existingPO.Id);
+			if(sourcePO2PRRMap.contains(sourcePOId)) {
+				List<PRR> PRRList = sourcePO2PRRMap.get(sourcePOId);
+				for(PRR obj : PRRList) {
+					obj.CHL_Partner_Opportunity__c = existingPO.Id;
+					obj.Incumbent = existingPO.Incumbent;
+				}
+				finalPRRList.addAll(PRRList);
+			}
+		}
+	}
+}
+------------------------Create new PRR-------------------------------------------
+for(PO po : newPOsList+existingPOList) {
+	if(rliList != null) {
+		for(RLI rli : rliList) {
+			newPRR.POid = po.id;
+			newPRR.RLIid = rli.id;
+			finalPRRList.add(newPRR);
+			//calculate earliest end date in earliestExpirationDate
+		}
+		//po.CHL_Expiration_Date__c = earliestExpirationDate;
+	}
+}
+
+if(finalPRRList != null) {
+	upsert finalPRRList;
+}
+for(PO existingPO : useExistingPO) {
+	existingPO.CHL_Expiration_Date__c = existingPO.CHL_Opportunity__r.CHL_Expiration_Date__c;
+}
